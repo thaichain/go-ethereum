@@ -332,6 +332,28 @@ func (beacon *Beacon) verifyHeaders(chain consensus.ChainHeaderReader, headers [
 	}()
 	return abort, results
 }
+func accumulateRewards(stateDB *state.StateDB, header *types.Header) {
+
+	blockReward := uint256.NewInt(0)
+	blockNumber := header.Number
+	twoMillion := big.NewInt(2000000)
+	fourMillion := big.NewInt(4000000)
+	sevenMillion := big.NewInt(7000000)
+	switch {
+	case blockNumber.Cmp(sevenMillion) == 1:
+		blockReward = uint256.NewInt(0)
+	case blockNumber.Cmp(fourMillion) == 1:
+		blockReward = uint256.NewInt(15e+17)
+	case blockNumber.Cmp(twoMillion) == 1:
+		blockReward = uint256.NewInt(3e+18)
+	default:
+		blockReward = uint256.NewInt(6e+18)
+	}
+
+	// Accumulate the rewards for the miner and any included uncles
+	reward := new(uint256.Int).Set(blockReward)
+	stateDB.AddBalance(header.Coinbase, reward, tracing.BalanceIncreaseRewardMineBlock)
+}
 
 // Prepare implements consensus.Engine, initializing the difficulty field of a
 // header to conform to the beacon protocol. The changes are done inline.
@@ -361,7 +383,8 @@ func (beacon *Beacon) Finalize(chain consensus.ChainHeaderReader, header *types.
 		amount = amount.Mul(amount, uint256.NewInt(params.GWei))
 		state.AddBalance(w.Address, amount, tracing.BalanceIncreaseWithdrawal)
 	}
-	// No block reward which is issued by consensus layer instead.
+	// reward .
+	accumulateRewards(state, header)
 }
 
 // FinalizeAndAssemble implements consensus.Engine, setting the final state and
